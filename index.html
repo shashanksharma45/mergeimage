@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenshot Combiner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .canvas-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        canvas {
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            cursor: pointer;
+            background-color: #fff;
+        }
+        canvas.selected {
+            border: 2px solid #4CAF50;
+        }
+        #laptop-canvas {
+            width: 842px;
+            height: 567px;
+        }
+        #mobile-canvas {
+            width: 370px;
+            height: 567px;
+        }
+        #combine-button {
+            background-color: #4CAF50;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        #combine-button:hover {
+            background-color: #3e8e41;
+        }
+        .heading {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        #result-image {
+            margin-top: 20px;
+            max-width: 100%;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="canvas-container">
+            <div>
+                <h2 class="heading">Laptop Screenshot</h2>
+                <canvas id="laptop-canvas" tabindex="1"></canvas>
+            </div>
+            <div>
+                <h2 class="heading">Mobile Screenshot</h2>
+                <canvas id="mobile-canvas" tabindex="2"></canvas>
+            </div>
+        </div>
+        <button id="combine-button">Combine</button>
+        <img id="result-image" alt="Combined Screenshot">
+    </div>
+
+    <script>
+        let laptopImage = null;
+        let mobileImage = null;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const laptopCanvas = document.getElementById("laptop-canvas");
+            const mobileCanvas = document.getElementById("mobile-canvas");
+            const combineButton = document.getElementById("combine-button");
+            const resultImage = document.getElementById("result-image");
+
+            laptopCanvas.addEventListener("click", function() {
+                selectCanvas(laptopCanvas);
+            });
+
+            mobileCanvas.addEventListener("click", function() {
+                selectCanvas(mobileCanvas);
+            });
+
+            document.addEventListener("paste", function(event) {
+                const clipboardData = event.clipboardData;
+                const items = clipboardData.items;
+                if (items.length > 0) {
+                    const imageItem = Array.from(items).find(item => item.type.includes("image"));
+                    if (imageItem) {
+                        const imageFile = imageItem.getAsFile();
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            const image = new Image();
+                            image.onload = function() {
+                                const focusedElement = document.activeElement;
+                                if (focusedElement === laptopCanvas) {
+                                    laptopImage = image;
+                                    displayImage(laptopCanvas, image);
+                                } else if (focusedElement === mobileCanvas) {
+                                    mobileImage = image;
+                                    displayImage(mobileCanvas, image);
+                                } else {
+                                    alert("Select a canvas to paste the screenshot.");
+                                }
+                            };
+                            image.src = event.target.result;
+                        };
+                        reader.readAsDataURL(imageFile);
+                    }
+                }
+            });
+
+            combineButton.addEventListener("click", combineScreenshots);
+
+            function selectCanvas(canvas) {
+                laptopCanvas.classList.remove('selected');
+                mobileCanvas.classList.remove('selected');
+                canvas.classList.add('selected');
+                canvas.focus();
+            }
+
+            function displayImage(canvas, image) {
+                const ctx = canvas.getContext("2d");
+                const aspectRatio = image.width / image.height;
+                let newWidth, newHeight;
+
+                if (canvas.id === 'laptop-canvas') {
+                    newWidth = laptopCanvas.width;
+                    newHeight = newWidth / aspectRatio;
+                } else if (canvas.id === 'mobile-canvas') {
+                    newWidth = mobileCanvas.width;
+                    newHeight = newWidth / aspectRatio;
+                }
+
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(image, 0, 0, newWidth, newHeight);
+            }
+
+            function combineScreenshots() {
+                if (laptopImage === null || mobileImage === null) {
+                    alert("Both screenshots must be pasted before combining.");
+                    return;
+                }
+
+                // Calculate dimensions for the final combined image
+                const finalWidth = laptopImage.width + mobileImage.width;
+                const finalHeight = laptopImage.height = mobileImage.height;
+
+                // Create a result canvas
+                const resultCanvas = document.createElement('canvas');
+                resultCanvas.width = finalWidth;
+                resultCanvas.height = finalHeight;
+                const resultCtx = resultCanvas.getContext('2d');
+
+                // Draw images on the result canvas without overlapping
+                resultCtx.drawImage(laptopImage, 0, 0, laptopImage.width, laptopImage.height);
+                resultCtx.drawImage(mobileImage, laptopImage.width, 0, mobileImage.width, mobileImage.height);
+
+                // Convert result canvas to image data URL
+                const combinedImageSrc = resultCanvas.toDataURL("image/png", 1.0);
+
+                // Display combined image in result image element
+                resultImage.src = combinedImageSrc;
+                resultImage.style.display = 'block';
+
+                // Copy combined image to clipboard
+                resultCanvas.toBlob(function(blob) {
+                    const item = new ClipboardItem({ "image/png": blob });
+                    navigator.clipboard.write([item]).then(function() {
+                        console.log("Combined image copied to clipboard.");
+                    }).catch(function(error) {
+                        console.error("Error copying combined image to clipboard:", error);
+                    });
+                }, "image/png", 1.0);
+            }
+        });
+    </script>
+</body>
+</html>
